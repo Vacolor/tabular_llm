@@ -1,0 +1,1 @@
+python plot.py --dset_id 6 --task multiclass --epochs 100 --active_log --accelerate --step 2
