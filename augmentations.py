@@ -1,3 +1,5 @@
+# embedding function (with masking) & data augmentation for pretraining
+
 import torch
 import numpy as np
 
@@ -7,14 +9,14 @@ def embed_data_mask(x_categ, x_cont, cat_mask, con_mask, model, vision_dset=Fals
     # categorial tokens here are integers
     # inputs here are np arrays
     x_categ = x_categ + model.categories_offset.type_as(x_categ)
-    x_categ_enc = model.embeds(x_categ, requires_grad=True)
+    x_categ_enc = model.embeds(x_categ)#.requires_grad()
     n1, n2 = x_cont.shape
     _, n3 = x_categ.shape
     if model.cont_embeddings == 'MLP':
         x_cont_enc = torch.empty(n1, n2, model.dim)
         for i in range(model.num_continuous):
             # there is distinct simple_MLP for each continuous column
-            x_cont_enc[:, i, :] = model.simple_MLP[i](x_cont[:,i], requires_grad=True)
+            x_cont_enc[:, i, :] = model.simple_MLP[i](x_cont[:,i])#.requires_grad()
     else:
         raise Exception('This case should not work!')    
 
@@ -40,7 +42,7 @@ def embed_data_mask(x_categ, x_cont, cat_mask, con_mask, model, vision_dset=Fals
 
 
 
-
+"""
 def mixup_data(x1, x2 , lam=1.0, y= None, use_cuda=True):
     '''Returns mixed inputs, pairs of targets'''
 
@@ -83,3 +85,4 @@ def add_noise(x_categ,x_cont, noise_params = {'noise_type' : ['cutmix'],'lambda'
         
     else:
         print("yet to write this")
+"""

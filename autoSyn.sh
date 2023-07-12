@@ -1,0 +1,1 @@
+python train.py --dset_id 5 --task multiclass --attentiontype colrow --epochs 100 

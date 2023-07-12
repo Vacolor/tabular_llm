@@ -1,3 +1,6 @@
+# data_prep_ml: splitting data into "train", "validation", and "test"
+# DataSetCatCon: customized DataSet with categorial and continous tokens seperated
+
 import openml
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
@@ -127,7 +130,7 @@ class DataSetCatCon(Dataset):
     def __len__(self):
         return len(self.y)
     
-    def __getitem__(self, idx):
+    def __getitem__(self, idx): # serving for DataLoader of pytorch
         # X1 has categorical data, X2 has continuous
         return np.concatenate((self.cls[idx], self.X1[idx])), self.X2[idx], self.y[idx], np.concatenate((self.cls_mask[idx], self.X1_mask[idx])), self.X2_mask[idx]
 

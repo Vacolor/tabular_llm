@@ -1,3 +1,5 @@
+# main model
+
 from .model import *
 
 class sep_MLP(nn.Module):
@@ -8,7 +10,6 @@ class sep_MLP(nn.Module):
         for i in range(len_feats):
             self.layers.append(simple_MLP([dim,5*dim, categories[i]]))
 
-        
     def forward(self, x):
         y_pred = list([])
         for i in range(self.len_feats):
@@ -35,7 +36,7 @@ class BertBased(nn.Module):
         #ff_dropout = 0.,
         cont_embeddings = 'MLP',
         scalingfactor = 10,
-        attentiontype = 'col',
+        #attentiontype = 'col',
         final_mlp_style = 'common',
         y_dim = 2
         ):
@@ -65,7 +66,7 @@ class BertBased(nn.Module):
         self.dim = 768 # mounted for pretrained bert
         dim = self.dim
         self.cont_embeddings = cont_embeddings
-        self.attentiontype = attentiontype
+        #self.attentiontype = attentiontype
         self.final_mlp_style = final_mlp_style
 
         if self.cont_embeddings == 'MLP':
@@ -107,10 +108,13 @@ class BertBased(nn.Module):
         '''
         
         # pretrained bert
+        '''
         if attentiontype == 'col':
             self.transformer = BertEncoder()
         else:
             self.transformer = RCBertEncoder(style = attentiontype)
+        '''
+        self.transformer = BertEncoder()
         
         l = input_size // 8
         hidden_dimensions = list(map(lambda t: l * t, mlp_hidden_mults))

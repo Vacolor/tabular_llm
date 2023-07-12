@@ -26,7 +26,7 @@ parser.add_argument('--cont_embeddings', default='MLP', type=str,choices = ['MLP
 #parser.add_argument('--attention_heads', default=8, type=int)
 #parser.add_argument('--attention_dropout', default=0.1, type=float)
 #parser.add_argument('--ff_dropout', default=0.1, type=float)
-parser.add_argument('--attentiontype', default='colrow', type=str,choices = ['col','colrow','row','justmlp','attn','attnmlp'])
+parser.add_argument('--attentiontype', default='col', type=str,choices = ['col','colrow','row','justmlp','attn','attnmlp'])
 
 parser.add_argument('--optimizer', default='AdamW', type=str,choices = ['AdamW','Adam','SGD'])
 parser.add_argument('--scheduler', default='cosine', type=str,choices = ['cosine','linear'])
@@ -40,12 +40,12 @@ parser.add_argument('--set_seed', default= 1 , type=int)
 parser.add_argument('--dset_seed', default= 5 , type=int)
 parser.add_argument('--active_log', action = 'store_true')
 
-parser.add_argument('--pretrain', action = 'store_true')
-parser.add_argument('--pretrain_epochs', default=50, type=int)
-parser.add_argument('--pt_tasks', default=['contrastive','denoising'], type=str,nargs='*',choices = ['contrastive','contrastive_sim','denoising'])
-parser.add_argument('--pt_aug', default=[], type=str,nargs='*',choices = ['mixup','cutmix'])
-parser.add_argument('--pt_aug_lam', default=0.1, type=float)
-parser.add_argument('--mixup_lam', default=0.3, type=float)
+#parser.add_argument('--pretrain', action = 'store_true')
+#parser.add_argument('--pretrain_epochs', default=50, type=int)
+#parser.add_argument('--pt_tasks', default=['contrastive','denoising'], type=str,nargs='*',choices = ['contrastive','contrastive_sim','denoising'])
+#parser.add_argument('--pt_aug', default=[], type=str,nargs='*',choices = ['mixup','cutmix'])
+#parser.add_argument('--pt_aug_lam', default=0.1, type=float)
+#parser.add_argument('--mixup_lam', default=0.3, type=float)
 
 parser.add_argument('--train_mask_prob', default=0, type=float)
 parser.add_argument('--mask_prob', default=0, type=float)
@@ -61,6 +61,7 @@ parser.add_argument('--lam3', default=10, type=float)
 parser.add_argument('--final_mlp_style', default='sep', type=str,choices = ['common','sep'])
 
 parser.add_argument('--backbone', default = 'bert-base-uncased', type = str)
+parser.add_argument('--mode', default = 'semi', type = str, choices = ['semi', 'frozen', 'free'])
 
 
 opt = parser.parse_args()
@@ -80,14 +81,11 @@ os.makedirs(modelsave_path, exist_ok=True)
 
 if opt.active_log:
     import wandb
-    if opt.pretrain:
-        wandb.init(project="saint_v2_all", group =opt.run_name ,name = f'pretrain_{opt.task}_{str(opt.attentiontype)}_{str(opt.dset_id)}_{str(opt.set_seed)}')
+    if opt.task=='multiclass':
+        wandb.init(project="saint_v2_all_kamal", group =opt.run_name ,name = f'{opt.task}_{str(opt.attentiontype)}_{str(opt.dset_id)}_{str(opt.set_seed)}')
     else:
-        if opt.task=='multiclass':
-            wandb.init(project="saint_v2_all_kamal", group =opt.run_name ,name = f'{opt.task}_{str(opt.attentiontype)}_{str(opt.dset_id)}_{str(opt.set_seed)}')
-        else:
-            wandb.init(project="saint_v2_all", group =opt.run_name ,name = f'{opt.task}_{str(opt.attentiontype)}_{str(opt.dset_id)}_{str(opt.set_seed)}')
-   
+        wandb.init(project="saint_v2_all", group =opt.run_name ,name = f'{opt.task}_{str(opt.attentiontype)}_{str(opt.dset_id)}_{str(opt.set_seed)}')
+
 
 
 print('Downloading and processing the dataset, it might take some time.')
@@ -144,7 +142,7 @@ dim_out = 1,
 #ff_dropout = opt.ff_dropout,                  
 mlp_hidden_mults = (4, 2),       
 cont_embeddings = opt.cont_embeddings,
-attentiontype = opt.attentiontype,
+#attentiontype = opt.attentiontype,
 final_mlp_style = opt.final_mlp_style,
 y_dim = y_dim
 )
@@ -216,7 +214,8 @@ for epoch in range(opt.epochs):
         # select only the representations corresponding to CLS token and apply mlp on it in the next step to get the predictions.
         y_reps = reps[:, 0, :]
         
-        y_outs = model.mlpfory(y_reps, requires_grad=True)
+        y_outs = model.mlpfory(y_reps)#.requires_grad()
+        #print("###########grading pooling############", y_outs.requires_grad)
         if opt.task == 'regression':
             loss = criterion(y_outs, y_gts) 
         else:
@@ -233,7 +232,7 @@ for epoch in range(opt.epochs):
         wandb.log({'epoch': epoch ,'train_epoch_loss': running_loss, 
         'loss': loss.item()
         })
-    if epoch%5==0:
+    if epoch%10==0:
             model.eval()
             with torch.no_grad():
                 if opt.task in ['binary', 'multiclass']:

@@ -1,3 +1,5 @@
+#
+
 import torch
 from sklearn.metrics import roc_auc_score, mean_squared_error
 import numpy as np
@@ -71,7 +73,7 @@ def multiclass_acc_justy(model,dloader,device):
     return acc, 0
 
 
-def classification_scores(model, dloader, device, task,vision_dset):
+def classification_scores(model, dloader, device, task, vision_dset): # vision_dset is a bool indicating if this is a vision dataset
     model.eval()
     m = nn.Softmax(dim=1)
     y_test = torch.empty(0).to(device)
@@ -79,22 +81,24 @@ def classification_scores(model, dloader, device, task,vision_dset):
     prob = torch.empty(0).to(device)
     with torch.no_grad():
         for i, data in enumerate(dloader, 0):
-            x_categ, x_cont, y_gts, cat_mask, con_mask = data[0].to(device), data[1].to(device),data[2].to(device),data[3].to(device),data[4].to(device)
-            _ , x_categ_enc, x_cont_enc = embed_data_mask(x_categ, x_cont, cat_mask, con_mask,model,vision_dset)           
+            x_categ, x_cont, y_gts, cat_mask, con_mask = data[0].to(device), data[1].to(device), data[2].to(device), data[3].to(device), data[4].to(device)
+            _ , x_categ_enc, x_cont_enc = embed_data_mask(x_categ, x_cont, cat_mask, con_mask,model, vision_dset)           
             reps = model.transformer(x_categ_enc, x_cont_enc)
-            y_reps = reps[:,0,:]
-            y_outs = model.mlpfory(y_reps)
+            y_reps = reps[:, 0, :] # batch size * tuple size * dim; selecting first element, that is, cls token, for each tuple in the batch
+            y_outs = model.mlpfory(y_reps) # [ [a, b, c, ...], [d, e, f, ...], ...]
             # import ipdb; ipdb.set_trace()   
-            y_test = torch.cat([y_test,y_gts.squeeze().float()],dim=0)
-            y_pred = torch.cat([y_pred,torch.argmax(y_outs, dim=1).float()],dim=0)
+            y_test = torch.cat([y_test, y_gts.squeeze().float()], dim=0) # [a, b, c, d, ...]
+            y_pred = torch.cat([y_pred, torch.argmax(y_outs, dim=1).float()], dim=0) # [a, e, ...]
             if task == 'binary':
-                prob = torch.cat([prob,m(y_outs)[:,-1].float()],dim=0)
+                # 只取最后一个可还行。。。训练的时候应该是这么干的
+                # 这就有点子神奇了————我们只需要一个值来表示两种可能，却又用n个值来表示n种可能
+                prob = torch.cat([prob, m(y_outs)[:, -1].float()], dim=0) 
      
     correct_results_sum = (y_pred == y_test).sum().float()
-    acc = correct_results_sum/y_test.shape[0]*100
+    acc = correct_results_sum / y_test.shape[0] * 100
     auc = 0
     if task == 'binary':
-        auc = roc_auc_score(y_score=prob.cpu(), y_true=y_test.cpu())
+        auc = roc_auc_score(y_score = prob.cpu(), y_true = y_test.cpu())
     return acc.cpu().numpy(), auc
 
 def mean_sq_error(model, dloader, device, vision_dset):

@@ -1,3 +1,5 @@
+# modules: Residual, PreNorm, MLP, (Transformer), Bert embedder & encoder
+
 import torch
 import torch.nn.functional as F
 from torch import nn, einsum
@@ -153,7 +155,7 @@ class Transformer(nn.Module):
 '''
     
 # pretrained bert
-class BertEmbedder(nn.Module): # embedding tokens into tensors
+class BertEmbedder(nn.Module): # embedding tokens into tensors; not used by default
     def __init__(self, *args, **kwargs) -> None:
         super().__init__()
         bert = AutoModel.from_pretrained("bert-base-uncased")
@@ -163,28 +165,51 @@ class BertEmbedder(nn.Module): # embedding tokens into tensors
         return self.embedder(x['input_ids'])
     
 class BertEncoder(nn.Module): ### dealing with tensors, attentiontype='col'
-    def __init__(self, *args, **kwargs):
+    def __init__(self, mode, n_layers = 12, dropout_p = 0.1, *args, **kwargs):
         super().__init__()
+        assert mode in ['free', 'frozen', 'semi']
         bert = AutoModel.from_pretrained("bert-base-uncased")
-        with torch.no_grad():
-            self.encoder = bert.encoder
+        self.encoder = nn.ModuleList(bert.encoder.layer[:n_layers])
         #self.pooler = BertPooler()
-        
-    def forward(self, x, x_cont=None):
+        self.mode = mode
+        if dropout_p != 0.1:
+            for layer in self.encoder:
+                layer.attention.self.dropout.p = dropout_p
+                layer.attention.output.dropout.p = dropout_p
+                layer.output.dropout.p = dropout_p
+                
+    def forward(self, x_cont=None):
         if x_cont is not None:
             x = torch.cat((x, x_cont), dim=1) # dim=1: combine on rows
-        with torch.no_grad():
+        if self.mode == 'free':
             x = self.encoder(x)['last_hidden_state']
+        elif self.mode == 'frozen':
+            with torch.no_grad():
+                x = self.encoder(x)['last_hidden_state']
+        else: # semi-frozen: keep LayerNorms, embedder, and final mlp free
+            for layer in self.encoder:
+                with torch.no_grad():
+                    x = layer.attention.self(x)
+                    x = layer.attention.output.dense(x)
+                x = layer.attention.output.LayerNorm(x)
+                x = layer.attention.output.dropout(x)
+                with torch.no_grad():
+                    x = layer.intermediate(x)
+                    x = layer.output.dense(x)
+                x = layer.output.LayerNorm(x)
+                x = layer.output.dropout(x)
+                
         return x
     
+'''
 class RCBertEncoder(nn.Module):
     def __init__(self, style = 'row', *args, **kwargs) -> None:
         super().__init__()
         self.style = style
         bert = AutoModel.from_pretrained("bert-base-uncased")
         with torch.no_grad():
-            self.encoder = bert.encoder
-        #self.pooler = BertPooler()
+            self.encoder1 = bert.encoder
+            self.encoder2 = bert.encoder
             
     def forward(self, x, x_cont=None):
         if x_cont is not None:
@@ -192,13 +217,14 @@ class RCBertEncoder(nn.Module):
         b, n, d = x.shape
         with torch.no_grad():    
             if self.style == 'colrow':
-                x = self.encoder(x)['last_hidden_state']
+                x = self.encoder1(x)['last_hidden_state']
             # else: style = 'row'
             x = rearrange(x, 'b n d -> 1 b (n d)')
-            x = self.encoder(x)['last_hidden_state']
+            x = self.encoder2(x)['last_hidden_state']
             x = rearrange(x, '1 b (n d) -> b n d', n = n)
         return x
-            
+'''
+
 class BertTokenizer(nn.Module): # converting words into tokens
     def __init__(self, *args, **kwargs) -> None:
         super().__init__()
