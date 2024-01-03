@@ -1,3 +1,5 @@
+# This work is modified upon SAINT. Original README is below.
+
 This repository is the official PyTorch implementation of SAINT. Find the paper on [arxiv](https://arxiv.org/abs/2106.01342) 
 
 # SAINT: Improved Neural Networks for Tabular Data via Row Attention and Contrastive Pre-Training
